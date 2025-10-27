@@ -1,0 +1,73 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        // {
+        //     "label": "🔧build",
+        //     "type": "shell",
+        //     "command": "make",
+        //     "args": [
+        //         "-j16"
+        //     ],
+        //     "group": "build",
+        //     "presentation": {
+        //         "reveal": "silent"
+        //     },
+        //     "problemMatcher": [
+        //         "$gcc"
+        //     ]
+        // },
+        // {
+        //     "label": "🧹clean",
+        //     "type": "shell",
+        //     "command": "make",
+        //     "args": [
+        //         "clean"
+        //     ],
+        //     "group": "build",
+        //     "presentation": {
+        //         "reveal": "silent"
+        //     },
+        //     "problemMatcher": [
+        //         "$gcc"
+        //     ]
+        // },
+        // {
+        //     "label": "🔧&🧹rebuild",
+        //     "type": "shell",
+        //     "command": "make",
+        //     "args": [
+        //         "-j8"
+        //     ],
+        //     "group": "build",
+        //     "presentation": {
+        //         "reveal": "silent"
+        //     },
+        //     "dependsOn": [
+        //         "🧹clean"
+        //     ],
+        //     "problemMatcher": [
+        //         "$gcc"
+        //     ]
+        // },
+        {
+            "label": "🔥flash",
+            "type": "shell",
+            "command": "openocd",
+            "args": [
+                "-f",
+                "interface/stlink-v2.cfg",
+                "-f",
+                "target/stm32h7x.cfg",
+                "-c",
+                "program build/Debug/my_bootloader.elf verify reset exit"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "never"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+    ]
+}

@@ -1,0 +1,42 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        //stlink via openocd
+        {
+            "cwd": "${workspaceRoot}",
+            "executable": "./build/Debug/${workspaceRootFolderName}.elf",
+            "name": "Debug with ST-LINK via OpenOCD",
+            "request": "launch",
+            "type": "cortex-debug",
+            "servertype": "openocd",
+            "svdPath": "${workspaceFolder}/STM32H750x.svd",
+            "liveWatch": {
+                "enabled": true,
+                "samplesPerSecond": 4
+            },
+            "device": "STM32H750VBT6",
+            "configFiles": [
+                "interface/stlink.cfg",
+                "target/stm32h7x.cfg"
+            ],
+            "searchDir": [
+                "D:/environment/OpenOCD/share/openocd/scripts"
+            ],
+            "runToEntryPoint": "main",
+            "showDevDebugOutput": "raw"
+        },
+        //daplink via openocd
+        {
+            "cwd": "${workspaceRoot}",
+            "executable": "./build/Debug/${workspaceRootFolderName}.elf",
+            "name": "Debug with DAP-LINK with OpenOCD",
+            "request": "launch",
+            "type": "cortex-debug",
+            "servertype": "openocd",
+            "configFiles": [],
+            "searchDir": [],
+            "runToEntryPoint": "main",
+            "showDevDebugOutput": "none"
+        },
+    ]
+}
