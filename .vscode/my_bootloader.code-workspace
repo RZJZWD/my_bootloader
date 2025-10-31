@@ -6,7 +6,12 @@
     ],
     "settings": {
         "files.associations": {
-            "usb_device.h": "c"
+            "usb_device.h": "c",
+            "boot.h": "c",
+            "key_driver.h": "c",
+            "stdbool.h": "c",
+            "string.h": "c",
+            "stdio.h": "c"
         }
     }
 }

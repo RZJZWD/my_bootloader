@@ -21,10 +21,12 @@
 #include "crc.h"
 #include "gpio.h"
 // #include "quadspi.h"
-#include "usb_device.h"
+// #include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+// #include "boot.h"
+#include "boot.h"
 #include "key_driver.h"
 #include "led_driver.h"
 #include <stdio.h>
@@ -38,25 +40,13 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define BOOT
-#define BOOT_WAIT_TIME 2000
 // #define APP
-#define APP_ADDRESS 0x08010000
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-typedef void (*pFunction)(void);
-typedef struct {
-    uint32_t stack_ptr;
-    pFunction reset_handler;
-} VectorTable_t;
-typedef enum {
-    BOOTMODE_WAIT,
-    BOOTMODE_BOOTLOADER,
-    BOOTMODE_APP_VALID,
-    BOOTMODE_APP_JUMP
-} BootMode_t;
-BootMode_t BootMode = BOOTMODE_WAIT;
+
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -71,16 +61,13 @@ void SystemClock_Config(void);
 static void MPU_Config(void);
 /* USER CODE BEGIN PFP */
 
-uint8_t is_application_valid(void);
-void jump_to_application(void);
-void bootloader_mode(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
 /* USER CODE END 0 */
-
+#if defined(BOOT)
 /**
  * @brief  The application entry point.
  * @retval int
@@ -116,7 +103,8 @@ int main(void) {
     MX_GPIO_Init();
     // MX_QUADSPI_Init();
     MX_CRC_Init();
-    MX_USB_DEVICE_Init();
+    // MX_USB_DEVICE_Init();
+
     /* USER CODE BEGIN 2 */
     LED_InitDev(&LED, LED_GPIO_Port, LED_Pin, 1);
     KEY_InitDev(&K1, K1_GPIO_Port, K1_Pin, 1);
@@ -129,36 +117,66 @@ int main(void) {
         /* USER CODE END WHILE */
 
         /* USER CODE BEGIN 3 */
-        switch (BootMode) {
-        case BOOTMODE_WAIT:
-            if (HAL_GetTick() > BOOT_WAIT_TIME) {
-                BootMode = BOOTMODE_APP_VALID;
-            } else if (KEY_GetState(&K1) == KEY_State_DOWN) {
-                BootMode = BOOTMODE_BOOTLOADER;
-            }
-            break;
-        case BOOTMODE_BOOTLOADER:
-            if (KEY_GetState(&K1) == KEY_State_DOWN) {
-                BootMode = BOOTMODE_APP_VALID;
-            } else {
-                bootloader_mode();
-            }
-            break;
-        case BOOTMODE_APP_VALID:
-            if (is_application_valid()) {
-                jump_to_application();
-            } else {
-                BootMode = BOOTMODE_BOOTLOADER;
-            }
-            break;
-        default:
-            BootMode = BOOTMODE_BOOTLOADER;
-            break;
-        }
+        bootModeHandler();
     }
     /* USER CODE END 3 */
 }
+#endif
 
+#if defined(APP)
+// start:0x0801 0000 size:0x10000
+/**
+ * @brief  The application entry point.
+ * @retval int
+ */
+int main(void) {
+
+    /* USER CODE BEGIN 1 */
+    SCB->VTOR = APP_ADDRESS;
+    __enable_irq();
+    /* USER CODE END 1 */
+
+    /* MPU
+     * Configuration--------------------------------------------------------*/
+    // MPU_Config();
+
+    /* MCU
+     * Configuration--------------------------------------------------------*/
+
+    /* Reset of all peripherals, Initializes the Flash interface and the
+     * Systick. */
+    HAL_Init();
+
+    /* USER CODE BEGIN Init */
+
+    /* USER CODE END Init */
+
+    /* Configure the system clock */
+    SystemClock_Config();
+
+    /* USER CODE BEGIN SysInit */
+
+    /* USER CODE END SysInit */
+
+    /* Initialize all configured peripherals */
+    MX_GPIO_Init();
+    MX_QUADSPI_Init();
+    /* USER CODE BEGIN 2 */
+    LED_InitDev(&LED, LED_GPIO_Port, LED_Pin, 1);
+    KEY_InitDev(&K1, K1_GPIO_Port, K1_Pin, 1);
+    printf("test");
+    /* USER CODE END 2 */
+
+    /* Infinite loop */
+    /* USER CODE BEGIN WHILE */
+    while (1) {
+        /* USER CODE END WHILE */
+        LED_Blink(&LED, 100);
+        /* USER CODE BEGIN 3 */
+    }
+    /* USER CODE END 3 */
+}
+#endif
 /**
  * @brief System Clock Configuration
  * @retval None
@@ -216,68 +234,7 @@ void SystemClock_Config(void) {
 }
 
 /* USER CODE BEGIN 4 */
-uint8_t is_application_valid(void) {
-    // RAM_size = 20000; // DTCMRAM
-    // FLASH_size = 20000;
-    const VectorTable_t *app_vector_table = (VectorTable_t *)APP_ADDRESS;
 
-    // check stack ptr is in valid addr scoop
-    // stm32 RAM usually start 0x2000 0000
-    if ((app_vector_table->stack_ptr < 0x20000000) ||
-        (app_vector_table->stack_ptr > 0x20020000)) {
-        return 0;
-    }
-    // check reset handle ptr is in valid addr scoop
-    uint32_t reset_handler = (uint32_t)app_vector_table->reset_handler;
-    if (reset_handler < APP_ADDRESS ||
-        reset_handler > FLASH_END) { /* 必须在应用程序 Flash 区域内 */
-        return 0;
-    }
-
-    // check irq table is 0 or 1 (esare state)
-    uint32_t *app_start = (uint32_t *)APP_ADDRESS;
-    for (int i = 0; i < 16; i++) // check the first 16 word
-    {
-        if (app_start[i] != 0xFFFFFFFF && app_start[i] != 0x00000000) {
-            // not empty data, app exit
-            // printf("Application validation passed\r\n");
-            return 1;
-        }
-    }
-
-    return 0;
-}
-void jump_to_application(void) {
-    const VectorTable_t *app_vector_table = (VectorTable_t *)APP_ADDRESS;
-
-    // disabel irq
-    __disable_irq();
-
-    // set top stack pointer
-    __set_MSP(app_vector_table->stack_ptr);
-
-    // set irq table offset
-    SCB->VTOR = APP_ADDRESS;
-
-    // jump to app reset handle programe
-    app_vector_table->reset_handler();
-
-    // if jump defeated, programe don't run to here
-    while (1)
-        ;
-}
-void bootloader_mode(void) {
-    // app addr is no programe
-    LED_Blink(&LED, 1000);
-    // while (1) {
-
-    //     // if ((KEY_GetState(&K1) == KEY_State_DOWN) &&
-    //     is_application_valid())
-    //     // {
-    //     //     jump_to_application();
-    //     // }
-    // }
-}
 /* USER CODE END 4 */
 
 /* MPU Configuration */

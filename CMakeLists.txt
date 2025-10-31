@@ -61,6 +61,8 @@ add_custom_command(
 add_subdirectory(cmake/stm32cubemx)
 # 添加bsp驱动
 add_subdirectory(Drivers/BSP_drivers)
+add_subdirectory(Components)
+
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -89,8 +91,6 @@ list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
 target_link_libraries(${CMAKE_PROJECT_NAME}
     stm32cubemx
     BSP_drivers
+    Components
     # Add user defined libraries
 )
-
-
-
