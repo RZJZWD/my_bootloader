@@ -89,7 +89,7 @@ bool command_get_frame(command_frame_t *frame);
  * @param data 数据
  * @param data_len 数据长度
  * @param output_buffer 输出缓冲
- * @return uint16_t 命令帧长度
+ * @return uint16_t 命令帧长度，帧头+命令字+数据位+数据+校验
  */
 uint16_t command_build_frame(command_type_t cmd, uint8_t *data,
                              uint16_t data_len, uint8_t *output_buffer);

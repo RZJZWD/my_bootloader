@@ -20,6 +20,5 @@ add_executable(test_boot_cmd
     test_boot_cmd.c
     ../Components/TinyEmbedBoot/boot_cmd.c
 )
-
 # 添加测试
 add_test(NAME test_boot_cmd COMMAND test_boot_cmd)

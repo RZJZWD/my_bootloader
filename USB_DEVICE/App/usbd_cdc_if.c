@@ -22,7 +22,7 @@
 #include "usbd_cdc_if.h"
 
 /* USER CODE BEGIN INCLUDE */
-
+#include "boot.h"
 /* USER CODE END INCLUDE */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -158,6 +158,7 @@ static int8_t CDC_Init_FS(void) {
     /* Set Application Buffers */
     USBD_CDC_SetTxBuffer(&hUsbDeviceFS, UserTxBufferFS, 0);
     USBD_CDC_SetRxBuffer(&hUsbDeviceFS, UserRxBufferFS);
+
     return (USBD_OK);
     /* USER CODE END 3 */
 }
@@ -277,6 +278,11 @@ static int8_t CDC_Receive_FS(uint8_t *Buf, uint32_t *Len) {
     /* USER CODE BEGIN 6 */
     USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
     USBD_CDC_ReceivePacket(&hUsbDeviceFS);
+
+    // 按字节接收
+    for (uint32_t i = 0; i < *Len; i++) {
+        Boot_ReceiveCommand(Buf[i]);
+    }
     return (USBD_OK);
     /* USER CODE END 6 */
 }

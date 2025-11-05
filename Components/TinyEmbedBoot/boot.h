@@ -29,12 +29,21 @@ typedef enum {
 
 // 错误码定义
 typedef enum {
+    ERROR_CODE_NO_ERROR = 0x00,
     ERROR_CODE_PARSE_FAILED = 0x01,
     ERROR_CODE_UNKNOWN_CMD = 0x02,
     ERROR_CODE_INVALID_DATA = 0x03,
     ERROR_CODE_FLASH_ERROR = 0x04,
     ERROR_CODE_VERIFY_FAILED = 0x05,
+    ERROR_CODE_NUMS
 } BootErrorCode_t;
+
+/**
+ * @brief 获取错误信息
+ * @param errorCode 错误码
+ * @return 错误信息字符串
+ */
+const char *GetErrorMessage(BootErrorCode_t errorCode);
 
 // 数据发送函数指针类型
 typedef bool (*Boot_SendData_Func)(uint8_t *data, uint16_t length);
@@ -44,13 +53,32 @@ typedef bool (*Boot_SendData_Func)(uint8_t *data, uint16_t length);
  * @param send_func 数据发送函数指针
  */
 void Boot_Init(Boot_SendData_Func send_func);
-void Boot_ProcessStateMachine(void);
-uint8_t Boot_IsApplicationValid(void);
-void Boot_JumpToApplication(void);
-BootState_t Boot_EnterBootloaderMode(void);
-BootState_t Boot_GetCurrentState(void);
 
-// 通信模块
+/**
+ * @brief boot状态机
+ */
+void Boot_ProcessStateMachine(void);
+
+/**
+ * @brief 验证固件是否合法
+ * @return 0不合法 1合法
+ */
+uint8_t Boot_IsApplicationValid(void);
+
+/**
+ * @brief 跳转到固件
+ */
+void Boot_JumpToApplication(void);
+/**
+ * @brief 进入BootLoader模式，解析来自上位机的指令，进行固件升级等操作
+ * @return BootState_t 返回boot状态，用于跳转app
+ */
+BootState_t Boot_EnterBootloaderMode(void);
+
+/**
+ * @brief 处理接收数据。在数据接收回调函数中调用
+ * @param received_byte 按字节处理
+ */
 void Boot_ReceiveCommand(uint8_t received_byte);
 
 #ifdef __cplusplus

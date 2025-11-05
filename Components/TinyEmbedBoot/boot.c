@@ -2,23 +2,47 @@
 #include "boot_cmd.h"
 #include "key_driver.h"
 #include "led_driver.h"
+#include <string.h>
 
-extern KEY_Device_t key_device;
-extern LED_Device_t led_device;
+extern KEY_Device_t K1;
+extern LED_Device_t LED;
 
 static BootState_t current_boot_state = BOOT_STATE_WAIT;
 static parse_result_t command_parse_result;
 static command_frame_t current_frame;
 static volatile bool is_recived = false;
-static volatile bool is_process_error = false;
-
+static volatile BootErrorCode_t bootErrorCode = ERROR_CODE_NO_ERROR;
+static volatile bool is_run_app = false;
 // 发送函数指针
 static Boot_SendData_Func boot_send_func = NULL;
 
 // Boot初始化状态
 static bool boot_initialized = false;
 
-BootState_t Boot_GetCurrentState(void) { return current_boot_state; }
+// 错误信息
+const char *ErrorMessage[ERROR_CODE_NUMS] = {
+    "No error",              // 0x00
+    "Command parse failed",  // 0x01
+    "Unknown command",       // 0x02
+    "Invalid data format",   // 0x03
+    "Flash operation error", // 0x04
+    "Verification failed"    // 0x05
+};
+
+// 静态函数声明
+static void Boot_ProcessReceivedCommand(void);
+static bool Boot_SendFrame(command_type_t cmd, uint8_t *data,
+                           uint16_t data_len);
+static void Boot_SendAckResponse(void);
+static void Boot_SendErrorResponse(BootErrorCode_t errorCode);
+
+const char *GetErrorMessage(BootErrorCode_t errorCode) {
+    if (errorCode >= ERROR_CODE_NUMS) {
+        return "Unknown error code";
+    }
+    return ErrorMessage[errorCode];
+}
+
 void Boot_Init(Boot_SendData_Func send_func) {
     if (boot_initialized) {
         return; // 避免重复初始化
@@ -33,24 +57,32 @@ void Boot_Init(Boot_SendData_Func send_func) {
     // 初始化状态机
     current_boot_state = BOOT_STATE_WAIT;
     is_recived = false;
-    is_process_error = false;
-
+    bootErrorCode = ERROR_CODE_NO_ERROR;
+    is_run_app = false;
     boot_initialized = true;
 }
 
+// boot状态机及不同状态的处理函数
 void Boot_ProcessStateMachine(void) {
+    if (!boot_initialized) {
+        return;
+    }
     switch (current_boot_state) {
     case BOOT_STATE_WAIT:
         if (HAL_GetTick() > BOOT_WAIT_TIME_MS) {
             current_boot_state = BOOT_STATE_APPLICATION_JUMP;
-        } else if (KEY_GetState(&key_device) == KEY_State_DOWN) {
+        } else if (KEY_GetState(&K1) == KEY_State_DOWN) {
             current_boot_state = BOOT_STATE_BOOTLOADER;
+            const char enter_boot_str[] = "Enter BootLoader Mode\n";
+            boot_send_func((uint8_t *)enter_boot_str, strlen(enter_boot_str));
         }
         break;
 
     case BOOT_STATE_BOOTLOADER:
         BootState_t bootloader_result = Boot_EnterBootloaderMode();
         if (bootloader_result == BOOT_STATE_APPLICATION_JUMP) {
+            const char jump_to_app_str[] = "Jump To APP\n";
+            boot_send_func((uint8_t *)jump_to_app_str, strlen(jump_to_app_str));
             current_boot_state = BOOT_STATE_APPLICATION_JUMP;
         }
         break;
@@ -60,6 +92,8 @@ void Boot_ProcessStateMachine(void) {
             Boot_JumpToApplication();
         } else {
             current_boot_state = BOOT_STATE_BOOTLOADER;
+            const char enter_boot_str[] = "Enter BootLoader Mode\n";
+            boot_send_func((uint8_t *)enter_boot_str, strlen(enter_boot_str));
         }
         break;
 
@@ -120,39 +154,120 @@ void Boot_JumpToApplication(void) {
 
 BootState_t Boot_EnterBootloaderMode(void) {
     // Bootloader模式实现
-    if (is_recived) {
+    LED_Blink(&LED, 1000);
+    if (is_recived && bootErrorCode == ERROR_CODE_NO_ERROR) {
         // 命令处理状态机
-    } else if (is_process_error) {
+        is_recived = false; // 立即重置
+        Boot_ProcessReceivedCommand();
+        if (is_run_app) {
+            is_run_app = false;
+            return BOOT_STATE_APPLICATION_JUMP;
+        }
+
+    } else if (bootErrorCode != ERROR_CODE_NO_ERROR) {
         // 给上位机发送错误消息，利用command_build_frame打包，
         // 命令字为CMD_ERROR_RESPONSE 数据为错误信息表
         // 写一个错误信息表用来根据错误号给上位机反馈错误信息
+        Boot_SendErrorResponse(bootErrorCode);
+        bootErrorCode = ERROR_CODE_NO_ERROR; // 重置错误码
+    }
+    return BOOT_STATE_BOOTLOADER;
+}
+
+/**
+ * @brief 处理接收到的命令
+ */
+static void Boot_ProcessReceivedCommand(void) {
+    switch (current_frame.command) {
+    case CMD_ENTER_BOOT:
+        // 已经进入Bootloader，发送确认
+        Boot_SendAckResponse();
+        break;
+
+    case CMD_UPLOAD:
+        // 处理固件上传
+        Boot_ProcessUploadCommand(&current_frame);
+        Boot_SendAckResponse(); // 暂时只回复ACK
+        break;
+
+    case CMD_VERIFY:
+        // 处理验证命令
+        // Boot_ProcessVerifyCommand(&current_frame);
+        Boot_SendAckResponse(); // 暂时只回复ACK
+        break;
+
+    case CMD_RUN_APP:
+        // 收到跳转APP命令
+        Boot_SendAckResponse();
+        // 设置标志，让状态机在下个循环跳转
+        is_run_app = true;
+        break;
+    case CMD_ACK:
+        // 收到ACK测试命令
+        Boot_SendAckResponse();
+        break;
+
+    default:
+        Boot_SendErrorResponse(ERROR_CODE_UNKNOWN_CMD);
+        break;
     }
 }
 
+/**
+ * @brief 发送命令帧
+ */
+static bool Boot_SendFrame(command_type_t cmd, uint8_t *data,
+                           uint16_t data_len) {
+    uint8_t tx_buffer[FRAME_SIZE];
+    uint16_t frame_len = command_build_frame(cmd, data, data_len, tx_buffer);
+    return boot_send_func(tx_buffer, frame_len);
+}
+/**
+ * @brief 发送ACK响应
+ */
+static void Boot_SendAckResponse(void) { Boot_SendFrame(CMD_ACK, NULL, 0); }
+
+/**
+ * @brief 发送错误响应
+ */
+static void Boot_SendErrorResponse(BootErrorCode_t errorCode) {
+    const char *error_msg = GetErrorMessage(errorCode);
+    uint16_t error_msg_len = strlen(error_msg);
+    Boot_SendFrame(CMD_ERROR_RESPONSE, (uint8_t *)error_msg, error_msg_len);
+}
+
 void Boot_ReceiveCommand(uint8_t received_byte) {
-    // 命令处理实现
+    // 命令接收处理实现
     command_parse_result = command_process_byte(received_byte);
 
     switch (command_parse_result) {
     case PARSE_SUCCESS:
         if (command_get_frame(&current_frame)) {
             is_recived = true;
-            is_process_error = false;
+            bootErrorCode = ERROR_CODE_NO_ERROR;
         }
-
         break;
     case PARSE_ERROR_HEADER:
+        bootErrorCode = ERROR_CODE_PARSE_FAILED;
+        is_recived = false;
+        break;
     case PARSE_ERROR_INVALID_CMD:
+        bootErrorCode = ERROR_CODE_UNKNOWN_CMD;
+        is_recived = false;
+        break;
     case PARSE_ERROR_LENGTH:
+        bootErrorCode = ERROR_CODE_PARSE_FAILED;
+        is_recived = false;
+        break;
     case PARSE_ERROR_CHECKSUM:
-        is_process_error = true;
+        bootErrorCode = ERROR_CODE_PARSE_FAILED;
         is_recived = false;
         break;
     case PARSE_INCOMPLETE:
         // 正常状态，不做处理
         break;
     default:
-        is_process_error = true;
+        bootErrorCode = ERROR_CODE_NO_ERROR;
         is_recived = false;
         break;
     }

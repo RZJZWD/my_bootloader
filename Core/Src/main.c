@@ -21,11 +21,11 @@
 #include "crc.h"
 #include "gpio.h"
 // #include "quadspi.h"
-// #include "usb_device.h"
+#include "usb_device.h"
+#include "usbd_cdc_if.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-// #include "boot.h"
 #include "boot.h"
 #include "key_driver.h"
 #include "led_driver.h"
@@ -59,6 +59,7 @@ KEY_Device_t K1;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MPU_Config(void);
+bool CDC_transmit(uint8_t *data, uint16_t length);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -103,11 +104,12 @@ int main(void) {
     MX_GPIO_Init();
     // MX_QUADSPI_Init();
     MX_CRC_Init();
-    // MX_USB_DEVICE_Init();
+    MX_USB_DEVICE_Init();
 
     /* USER CODE BEGIN 2 */
     LED_InitDev(&LED, LED_GPIO_Port, LED_Pin, 1);
     KEY_InitDev(&K1, K1_GPIO_Port, K1_Pin, 1);
+    Boot_Init(CDC_transmit);
 
     /* USER CODE END 2 */
 
@@ -117,7 +119,7 @@ int main(void) {
         /* USER CODE END WHILE */
 
         /* USER CODE BEGIN 3 */
-        bootModeHandler();
+        Boot_ProcessStateMachine();
     }
     /* USER CODE END 3 */
 }
@@ -234,6 +236,14 @@ void SystemClock_Config(void) {
 }
 
 /* USER CODE BEGIN 4 */
+bool CDC_transmit(uint8_t *data, uint16_t length) {
+    uint8_t ret = CDC_Transmit_FS(data, length);
+    if (ret == USBD_OK) {
+        return true;
+    } else {
+        return false;
+    }
+}
 
 /* USER CODE END 4 */
 
