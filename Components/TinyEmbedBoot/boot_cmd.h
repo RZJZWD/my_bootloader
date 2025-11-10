@@ -21,12 +21,16 @@ typedef enum {
     CMD_VALID_END
 } command_type_t;
 
+struct test {
+    int a : 1;
+};
+
 // 帧头定义
 #define FRAME_HEADER1 0xAA
 #define FRAME_HEADER2 0x55
 
 // 命令帧数据长度大小
-#define FRAME_DATA_SIZE 2040
+#define FRAME_DATA_SIZE 2048
 #define FRAME_SIZE (FRAME_DATA_SIZE + 128)
 
 // 命令帧结构
@@ -37,7 +41,6 @@ typedef struct {
     uint8_t data[FRAME_DATA_SIZE];
     uint8_t checksum;
 } command_frame_t;
-
 // 解析结果
 typedef enum {
     PARSE_SUCCESS,

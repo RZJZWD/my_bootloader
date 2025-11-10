@@ -17,7 +17,9 @@ static void clear_command_frame(command_frame_t *frame) {
  */
 static uint8_t calculate_checksum(uint8_t *data, uint16_t length) {
     uint8_t sum = 0;
+
     for (uint16_t i = 0; i < length; i++) {
+        uint8_t temp = data[i];
         sum += data[i];
     }
     return (uint8_t)~sum;
@@ -114,9 +116,13 @@ parse_result_t command_process_byte(uint8_t byte) {
         // }
         // printf("\n");
 
-        uint16_t header_size =
-            sizeof(current_frame.command) + sizeof(current_frame.data_length);
-        checksum = calculate_checksum((uint8_t *)&current_frame.command,
+        /*
+         *这里要解释一下命令字加数据长度(header_size)为什么是4字节
+         *因为command_frame_t结构体的command枚举量在上,数据位(2byte)在下，
+         *所以command填充为2byte
+         */
+        uint16_t header_size = sizeof(uint16_t) + sizeof(uint16_t);
+        checksum = calculate_checksum((uint8_t *)&current_frame,
                                       header_size + current_frame.data_length);
 
         if (checksum == current_frame.checksum) {

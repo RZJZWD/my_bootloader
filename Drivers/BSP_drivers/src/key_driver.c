@@ -48,3 +48,4 @@ KEY_State_t KEY_GetState(KEY_Device_t *dev) {
 
     return KEY_State_NONE;
 }
+void KEY_DeInitDev(KEY_Device_t *dev) { HAL_GPIO_DeInit(dev->GPIOx, dev->Pin); }

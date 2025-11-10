@@ -14,6 +14,7 @@
             "stdio.h": "c",
             "usbd_cdc_if.h": "c",
             "usbd_cdc.h": "c"
-        }
+        },
+        "cortex-debug.variableUseNaturalFormat": true
     }
 }

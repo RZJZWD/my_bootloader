@@ -34,6 +34,7 @@ static void Boot_ProcessReceivedCommand(void);
 static bool Boot_SendFrame(command_type_t cmd, uint8_t *data,
                            uint16_t data_len);
 static void Boot_SendAckResponse(void);
+static void Boot_SendEnterBootResponse(void);
 static void Boot_SendErrorResponse(BootErrorCode_t errorCode);
 
 const char *GetErrorMessage(BootErrorCode_t errorCode) {
@@ -135,19 +136,41 @@ void Boot_JumpToApplication(void) {
     const VectorTableType *app_vector_table =
         (VectorTableType *)APPLICATION_START_ADDRESS;
 
-    // 禁用中断
+    // 禁用irq中断，仅关闭IRQ（普通中断），但不关闭FIQ（快速中断）
     __disable_irq();
+    // 禁用全部中断
+    __set_PRIMASK(1);
 
-    // 设置主栈指针
-    __set_MSP(app_vector_table->stack_pointer);
+    // 复位所有时钟到默认
+    HAL_RCC_DeInit();
+    KEY_DeInitDev(&K1);
+    LED_DeInitDev(&LED);
+    // 关闭systick，复位到默认值
+    SysTick->CTRL = 0;
+    SysTick->LOAD = 0;
+    SysTick->VAL = 0;
+
+    // 关闭所有中断，清除所有中断挂起标志
+    for (uint32_t i = 0; i < 8; i++) {
+        NVIC->ICER[i] = 0xFFFFFFFF;
+        NVIC->ICPR[i] = 0xFFFFFFFF;
+    }
 
     // 设置中断向量表偏移
     SCB->VTOR = APPLICATION_START_ADDRESS;
+    // 设置主栈指针
+    __set_MSP(app_vector_table->stack_pointer);
+    // 使用RTOS时，这句很重要，设置为特权级模式，使用MSP指针
+    __set_CONTROL(0);
+
+    // 在跳转前开启全局中断，让APP可以响应中断
+    __set_PRIMASK(0);
+    __enable_irq();
 
     // 跳转到应用程序复位处理函数
     app_vector_table->reset_handler();
 
-    // 如果跳转失败，程序不会运行到这里
+    // 如果跳转成功，程序不会运行到这里，用户可以在这里添加处理代码
     while (1)
         ;
 }
@@ -171,6 +194,10 @@ BootState_t Boot_EnterBootloaderMode(void) {
         Boot_SendErrorResponse(bootErrorCode);
         bootErrorCode = ERROR_CODE_NO_ERROR; // 重置错误码
     }
+
+    if (KEY_GetState(&K1) == KEY_State_DOWN) {
+        return BOOT_STATE_APPLICATION_JUMP;
+    }
     return BOOT_STATE_BOOTLOADER;
 }
 
@@ -181,7 +208,8 @@ static void Boot_ProcessReceivedCommand(void) {
     switch (current_frame.command) {
     case CMD_ENTER_BOOT:
         // 已经进入Bootloader，发送确认
-        Boot_SendAckResponse();
+        Boot_SendEnterBootResponse();
+        // Boot_SendAckResponse();
         break;
 
     case CMD_UPLOAD:
@@ -212,7 +240,16 @@ static void Boot_ProcessReceivedCommand(void) {
         break;
     }
 }
-
+/**
+ * @brief 处理固件升级指令
+ * @param frame 命令帧
+ * @return 1成功，0失败
+ */
+uint8_t Boot_ProcessUploadCommand(command_frame_t *frame) {
+    uint8_t *firmware;
+    static uint8_t total_packet;
+    static uint8_t num_packet;
+}
 /**
  * @brief 发送命令帧
  */
@@ -227,6 +264,32 @@ static bool Boot_SendFrame(command_type_t cmd, uint8_t *data,
  */
 static void Boot_SendAckResponse(void) { Boot_SendFrame(CMD_ACK, NULL, 0); }
 
+/**
+ * @brief 发送EnterBoot响应，用于发送设备信息
+ */
+static void Boot_SendEnterBootResponse(void) {
+    BOOT_DeviceInfo_t device;
+
+    memset(&device, 0, sizeof(BOOT_DeviceInfo_t));
+    // 设置设备模型名
+    strncpy(device.deviceInfo.model, DEVICE_INFO_MODEL,
+            DEVICE_INFO_MODEL_LENGTH - 1);
+    device.deviceInfo.model[DEVICE_INFO_MODEL_LENGTH - 1] = '\0'; // 确保终止
+
+    // 设置flash尺寸
+    device.deviceInfo.flashSize = DEVICE_INFO_FLASH_SIZE;
+
+    // 设置app加载地址
+    device.deviceInfo.appAddr = DEVICE_INFO_APP_ADDRESS;
+
+    // 设置boot版本
+    strncpy(device.deviceInfo.bootVersion, DEVICE_INFO_BOOT_VERSION,
+            DEVICE_INFO_BOOT_VERSION_LENGTH - 1);
+    device.deviceInfo.bootVersion[DEVICE_INFO_BOOT_VERSION_LENGTH - 1] =
+        '\0'; // 确保终止
+
+    Boot_SendFrame(CMD_ENTER_BOOT, device.rawData, sizeof(BOOT_DeviceInfo_t));
+}
 /**
  * @brief 发送错误响应
  */

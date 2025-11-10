@@ -1,6 +1,6 @@
 #ifndef _BOOT_H_
 #define _BOOT_H_
-
+#include "boot_cmd.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -8,9 +8,31 @@
 extern "C" {
 #endif
 
+// 编译器按字节对齐属性
+#if defined(__CC_ARM)
+#define ALIGNED(n) __attribute__((aligned(n)))
+#elif defined(__CLANG_ARM)
+#define ALIGNED(n) __attribute__((aligned(n)))
+#elif defined(__IAR_SYSTEMS_ICC__)
+#define ALIGNED(n) __ALIGNED(n)
+#elif defined(__GNUC__)
+#define ALIGNED(n) __attribute__((aligned(n)))
+#elif defined(_MSC_VER)
+#define ALIGNED(n) __declspec(align(n))
+#else
+#error "Unsupported compiler"
+#endif
+
+// 设备信息
+#define DEVICE_INFO_MODEL "STM32H750"
+#define DEVICE_INFO_FLASH_SIZE (128 * 1024)
+#define DEVICE_INFO_APP_ADDRESS (0x08010000)
+#define DEVICE_INFO_BOOT_VERSION "v1.1.1"
+#define DEVICE_INFO_MODEL_LENGTH 32
+#define DEVICE_INFO_BOOT_VERSION_LENGTH 16
 // 上电BOOT等待时间，超时进入app(如有)
 #define BOOT_WAIT_TIME_MS 2000
-#define APPLICATION_START_ADDRESS 0x08010000
+#define APPLICATION_START_ADDRESS DEVICE_INFO_APP_ADDRESS
 #define FLASH_END_ADDRESS 0x080FFFFF
 
 // 函数指针，用于复位函数实例化
@@ -37,6 +59,19 @@ typedef enum {
     ERROR_CODE_VERIFY_FAILED = 0x05,
     ERROR_CODE_NUMS
 } BootErrorCode_t;
+
+// 设备信息结构体（1字节对齐）
+typedef struct {
+    char model[DEVICE_INFO_MODEL_LENGTH];
+    uint32_t flashSize;
+    uint32_t appAddr;
+    char bootVersion[DEVICE_INFO_BOOT_VERSION_LENGTH];
+} ALIGNED(1) deviceInfo_t;
+
+typedef union {
+    uint8_t rawData[sizeof(deviceInfo_t)];
+    deviceInfo_t deviceInfo;
+} BOOT_DeviceInfo_t;
 
 /**
  * @brief 获取错误信息
@@ -80,6 +115,9 @@ BootState_t Boot_EnterBootloaderMode(void);
  * @param received_byte 按字节处理
  */
 void Boot_ReceiveCommand(uint8_t received_byte);
+
+/*暴露接口用来测试*/
+uint8_t Boot_ProcessUploadCommand(command_frame_t *frame);
 
 #ifdef __cplusplus
 }

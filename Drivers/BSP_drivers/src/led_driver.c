@@ -46,3 +46,5 @@ void LED_Blink(LED_Device_t *dev, uint32_t delay_ms) {
 
 // 状态查询
 uint8_t LED_GetState(LED_Device_t *dev) { return dev->State; }
+
+void LED_DeInitDev(LED_Device_t *dev) { HAL_GPIO_DeInit(dev->GPIOx, dev->Pin); }

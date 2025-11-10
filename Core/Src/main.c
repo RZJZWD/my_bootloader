@@ -134,8 +134,7 @@ int main(void) {
 int main(void) {
 
     /* USER CODE BEGIN 1 */
-    SCB->VTOR = APP_ADDRESS;
-    __enable_irq();
+    SCB->VTOR = APPLICATION_START_ADDRESS;
     /* USER CODE END 1 */
 
     /* MPU
