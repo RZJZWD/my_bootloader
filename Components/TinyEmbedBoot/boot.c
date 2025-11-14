@@ -246,9 +246,9 @@ static void Boot_ProcessReceivedCommand(void) {
  * @return 1成功，0失败
  */
 uint8_t Boot_ProcessUploadCommand(command_frame_t *frame) {
-    uint8_t *firmware;
     static uint8_t total_packet;
     static uint8_t num_packet;
+    uint8_t *firmware;
 }
 /**
  * @brief 发送命令帧

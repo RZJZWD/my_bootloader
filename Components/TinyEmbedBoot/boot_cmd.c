@@ -87,7 +87,7 @@ parse_result_t command_process_byte(uint8_t byte) {
         if (current_frame.data_length == 0) {
             rx_state = RX_STATE_CHECKSUM;
             ret = PARSE_INCOMPLETE;
-        } else if (current_frame.data_length < FRAME_SIZE) {
+        } else if (current_frame.data_length < FRAME_DATA_SIZE) {
             rx_state = RX_STATE_DATA;
             ret = PARSE_INCOMPLETE;
         } else {
@@ -121,7 +121,7 @@ parse_result_t command_process_byte(uint8_t byte) {
          *因为command_frame_t结构体的command枚举量在上,数据位(2byte)在下，
          *所以command填充为2byte
          */
-        uint16_t header_size = sizeof(uint16_t) + sizeof(uint16_t);
+        uint16_t header_size = sizeof(command_type_t) + sizeof(uint16_t);
         checksum = calculate_checksum((uint8_t *)&current_frame,
                                       header_size + current_frame.data_length);
 

@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 // 命令类型定义
-typedef enum {
+typedef enum : uint8_t {
     CMD_VALID_START,
     CMD_ENTER_BOOT = 0x01,
     CMD_UPLOAD = 0x02,
@@ -34,7 +34,7 @@ struct test {
 #define FRAME_SIZE (FRAME_DATA_SIZE + 128)
 
 // 命令帧结构
-typedef struct {
+typedef struct __attribute__((__packed__)) {
     command_type_t command;
     // 上位机传来的长度为小端序组成的两字节数据，所以先收到低字节，再收高字节
     uint16_t data_length;
