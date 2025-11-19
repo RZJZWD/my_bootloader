@@ -1,9 +1,9 @@
 #ifndef _BOOT_CMD_H_
 #define _BOOT_CMD_H_
+#include "boot_cfg.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -28,10 +28,18 @@ struct test {
 // 帧头定义
 #define FRAME_HEADER1 0xAA
 #define FRAME_HEADER2 0x55
+// 命令帧信息长度
+#define FRAME_HEADER_SIZE 1
+#define FRAME_COMMAND_SIZE 1
+#define FRAME_DATA_LENGTH_INFO 2
+#define FRAMR_CHECK_SUM_SIZE 1
 
 // 命令帧数据长度大小
-#define FRAME_DATA_SIZE 2048
-#define FRAME_SIZE (FRAME_DATA_SIZE + 128)
+#define FRAME_DATA_SIZE BOOT_FRAME_DATA_SIZE
+// 命令帧总长度
+#define FRAME_SIZE                                                             \
+    ((FRAME_HEADER_SIZE * 2) + FRAME_COMMAND_SIZE + FRAME_DATA_LENGTH_INFO +   \
+     FRAME_DATA_SIZE + FRAMR_CHECK_SUM_SIZE)
 
 // 命令帧结构
 typedef struct __attribute__((__packed__)) {

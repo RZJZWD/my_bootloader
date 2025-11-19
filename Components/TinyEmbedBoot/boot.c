@@ -10,23 +10,27 @@ extern LED_Device_t LED;
 static BootState_t current_boot_state = BOOT_STATE_WAIT;
 static parse_result_t command_parse_result;
 static command_frame_t current_frame;
+static BOOT_FirmwareInfo_t firmwareInfo;
 static volatile bool is_recived = false;
 static volatile BootErrorCode_t bootErrorCode = ERROR_CODE_NO_ERROR;
 static volatile bool is_run_app = false;
+
 // 发送函数指针
-static Boot_SendData_Func boot_send_func = NULL;
+Boot_SendData_Func boot_send_func = NULL;
 
 // Boot初始化状态
 static bool boot_initialized = false;
 
 // 错误信息
 const char *ErrorMessage[ERROR_CODE_NUMS] = {
-    "No error",              // 0x00
-    "Command parse failed",  // 0x01
-    "Unknown command",       // 0x02
-    "Invalid data format",   // 0x03
-    "Flash operation error", // 0x04
-    "Verification failed"    // 0x05
+    "No error",
+    "[parse] Command parse failed",
+    "[parse] Unknown command",
+    "[parse] Data length error, too long",
+    "[parse] Command frame check error",
+    "[firmware] Firmware is NULL or unequal data length",
+    "[firmware] Flash operation error",
+    "[firmware] Verification failed",
 };
 
 // 静态函数声明
@@ -36,7 +40,8 @@ static bool Boot_SendFrame(command_type_t cmd, uint8_t *data,
 static void Boot_SendAckResponse(void);
 static void Boot_SendEnterBootResponse(void);
 static void Boot_SendErrorResponse(BootErrorCode_t errorCode);
-
+static BootErrorCode_t Boot_ProcessUploadCommand(command_frame_t *frame);
+static BootErrorCode_t Boot_FlashProgram();
 const char *GetErrorMessage(BootErrorCode_t errorCode) {
     if (errorCode >= ERROR_CODE_NUMS) {
         return "Unknown error code";
@@ -209,13 +214,15 @@ static void Boot_ProcessReceivedCommand(void) {
     case CMD_ENTER_BOOT:
         // 已经进入Bootloader，发送确认
         Boot_SendEnterBootResponse();
-        // Boot_SendAckResponse();
         break;
 
     case CMD_UPLOAD:
         // 处理固件上传
-        Boot_ProcessUploadCommand(&current_frame);
-        Boot_SendAckResponse(); // 暂时只回复ACK
+        bootErrorCode = Boot_ProcessUploadCommand(&current_frame);
+        if (bootErrorCode == ERROR_CODE_NO_ERROR) {
+            // 没错误回复ack
+            Boot_SendAckResponse();
+        }
         break;
 
     case CMD_VERIFY:
@@ -236,20 +243,71 @@ static void Boot_ProcessReceivedCommand(void) {
         break;
 
     default:
-        Boot_SendErrorResponse(ERROR_CODE_UNKNOWN_CMD);
+        Boot_SendErrorResponse(ERROR_CODE_PARSE_UNKNOWN_CMD);
         break;
     }
 }
 /**
  * @brief 处理固件升级指令
  * @param frame 命令帧
- * @return 1成功，0失败
+ * @return 错误码
  */
-uint8_t Boot_ProcessUploadCommand(command_frame_t *frame) {
-    static uint8_t total_packet;
-    static uint8_t num_packet;
-    uint8_t *firmware;
+BootErrorCode_t Boot_ProcessUploadCommand(command_frame_t *frame) {
+    // 验证命令帧或者命令帧中固件数据是否为空
+    //  (sizeof(firmwareInfo_t) - DEVICE_INFO_FIRMWARE_PACKET_SIZE)==12
+    // 包号+总包数+crc32的==12字节
+    if (frame == NULL ||
+        frame->data_length <
+            (sizeof(firmwareInfo_t) - DEVICE_INFO_FIRMWARE_PACKET_SIZE)) {
+        return ERROR_CODE_FIRMWARE_INVALID_DATA;
+    }
+
+    // 初始化固件缓冲区为0xFF（Flash擦除状态）
+    memset(firmwareInfo.rawDate, 0xFF, sizeof(firmwareInfo_t));
+    // 内存拷贝确保数据对齐，按实际数据长度写入
+    memcpy(firmwareInfo.rawDate, frame->data, frame->data_length);
+    // 快速验证包序号
+    if (firmwareInfo.firmwareInfo.packetNum >=
+        firmwareInfo.firmwareInfo.packetTotalNum) {
+        return ERROR_CODE_FIRMWARE_INVALID_DATA;
+    }
+    // 验证CRC32
+    // todo 验证crc32
+    return Boot_FlashProgram();
+    // return ERROR_CODE_NO_ERROR;
 }
+BootErrorCode_t Boot_FlashProgram() {
+    // 计算flash地址
+    uint32_t flashAddr = (firmwareInfo.firmwareInfo.packetNum *
+                          DEVICE_INFO_FIRMWARE_PACKET_SIZE) +
+                         APPLICATION_START_ADDRESS;
+    // 验证地址对齐（闪存字需要32字节对齐）
+    if ((flashAddr & 0x1F) != 0) {
+        return ERROR_CODE_FIRMWARE_FLASH_ERROR;
+    }
+
+    // 解锁Flash
+    if (HAL_FLASH_Unlock() != HAL_OK) {
+        return ERROR_CODE_FIRMWARE_FLASH_ERROR;
+    }
+    uint8_t *data_ptr = firmwareInfo.firmwareInfo.firmware;
+    // flash编程的闪存字数（256位 = 32字节）
+    for (uint32_t byte_offset = 0;
+         byte_offset < DEVICE_INFO_FIRMWARE_PACKET_SIZE;
+         byte_offset += 32) { // 每次步进32字节
+        // 编程数据
+
+        if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_FLASHWORD,
+                              flashAddr + byte_offset, // 直接使用字节偏移
+                              (uint32_t)(data_ptr + byte_offset)) != HAL_OK) {
+            HAL_FLASH_Lock();
+            return ERROR_CODE_FIRMWARE_FLASH_ERROR;
+        }
+    }
+    HAL_FLASH_Lock();
+    return ERROR_CODE_NO_ERROR;
+}
+
 /**
  * @brief 发送命令帧
  */
@@ -281,7 +339,8 @@ static void Boot_SendEnterBootResponse(void) {
 
     // 设置app加载地址
     device.deviceInfo.appAddr = DEVICE_INFO_APP_ADDRESS;
-
+    // 设置固件包大小
+    device.deviceInfo.firmware_packet = DEVICE_INFO_FIRMWARE_PACKET_SIZE;
     // 设置boot版本
     strncpy(device.deviceInfo.bootVersion, DEVICE_INFO_BOOT_VERSION,
             DEVICE_INFO_BOOT_VERSION_LENGTH - 1);
@@ -315,15 +374,15 @@ void Boot_ReceiveCommand(uint8_t received_byte) {
         is_recived = false;
         break;
     case PARSE_ERROR_INVALID_CMD:
-        bootErrorCode = ERROR_CODE_UNKNOWN_CMD;
+        bootErrorCode = ERROR_CODE_PARSE_UNKNOWN_CMD;
         is_recived = false;
         break;
     case PARSE_ERROR_LENGTH:
-        bootErrorCode = ERROR_CODE_PARSE_FAILED;
+        bootErrorCode = ERROR_CODE_PARSE_ERROR_LENGTH;
         is_recived = false;
         break;
     case PARSE_ERROR_CHECKSUM:
-        bootErrorCode = ERROR_CODE_PARSE_FAILED;
+        bootErrorCode = ERROR_CODE_PARSE_ERROR_CHECKSUM;
         is_recived = false;
         break;
     case PARSE_INCOMPLETE:

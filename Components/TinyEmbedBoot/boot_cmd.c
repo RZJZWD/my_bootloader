@@ -19,7 +19,6 @@ static uint8_t calculate_checksum(uint8_t *data, uint16_t length) {
     uint8_t sum = 0;
 
     for (uint16_t i = 0; i < length; i++) {
-        uint8_t temp = data[i];
         sum += data[i];
     }
     return (uint8_t)~sum;

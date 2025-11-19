@@ -7,6 +7,7 @@ set(SOURCES
 set(HEADERS
     boot.h
     boot_cmd.h
+    boot_cfg.h
 )
 
 # 检查是否有源文件
