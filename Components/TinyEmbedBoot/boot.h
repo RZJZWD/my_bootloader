@@ -39,7 +39,7 @@ extern "C" {
 #define DEVICE_INFO_MODEL_LENGTH 32
 // 设备boot版本信息长度
 #define DEVICE_INFO_BOOT_VERSION_LENGTH 16
-// 固件信息单个长度 包好 包数 CRC32都是4字节
+// 固件信息单个长度 包号 包数 CRC32都是4字节
 #define FIRMWARE_PACKET_INFO_SIZE 4
 
 // 上电BOOT等待时间，超时进入app(如有)

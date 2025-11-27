@@ -21,10 +21,6 @@ typedef enum : uint8_t {
     CMD_VALID_END
 } command_type_t;
 
-struct test {
-    int a : 1;
-};
-
 // 帧头定义
 #define FRAME_HEADER1 0xAA
 #define FRAME_HEADER2 0x55

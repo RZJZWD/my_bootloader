@@ -27,6 +27,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "boot.h"
+#include "boot_cfg.h"
 #include "key_driver.h"
 #include "led_driver.h"
 #include <stdio.h>
@@ -134,7 +135,7 @@ int main(void) {
 int main(void) {
 
     /* USER CODE BEGIN 1 */
-    SCB->VTOR = APPLICATION_START_ADDRESS;
+    SCB->VTOR = BOOT_APP_ADDRESS;
     /* USER CODE END 1 */
 
     /* MPU
@@ -161,11 +162,10 @@ int main(void) {
 
     /* Initialize all configured peripherals */
     MX_GPIO_Init();
-    MX_QUADSPI_Init();
+    // MX_QUADSPI_Init();
     /* USER CODE BEGIN 2 */
     LED_InitDev(&LED, LED_GPIO_Port, LED_Pin, 1);
     KEY_InitDev(&K1, K1_GPIO_Port, K1_Pin, 1);
-    printf("test");
     /* USER CODE END 2 */
 
     /* Infinite loop */
