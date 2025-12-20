@@ -5,12 +5,14 @@ set(DRIVER_NAME BSP_drivers)
 set(SOURCES
     "src/key_driver.c"
     "src/led_driver.c"
+    "src/uart_driver.c"
 )
 
 # 显式指定头文件（只包含 key 和 led）
 set(HEADERS
     "inc/key_driver.h"
     "inc/led_driver.h"
+    "inc/uart_driver.h"
 )
 
 # 检查是否有源文件

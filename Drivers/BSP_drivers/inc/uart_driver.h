@@ -56,7 +56,7 @@ void UART_Transmit(UART_Device_t *dev, uint8_t *data, uint16_t size);
 void UART_Receive_IT(UART_Device_t *dev, uint8_t *data, uint16_t size);
 
 // 中断处理
-void UART_userIRQ_Handler(UART_Device_t *dev);
+// void UART_userIRQ_Handler(UART_Device_t *dev);
 
 #ifdef __cplusplus
 }

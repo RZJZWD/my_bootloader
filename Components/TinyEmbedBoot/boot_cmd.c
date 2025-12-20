@@ -1,6 +1,8 @@
 #include "boot_cmd.h"
 #include "string.h"
 
+// #define my_offsetof(type, member) ((int)&(((type *)0)->member))
+
 static rx_state_t rx_state = RX_STATE_HEADER1;
 static command_frame_t current_frame;
 static uint16_t data_recived_size = 0;
@@ -12,7 +14,7 @@ static void clear_command_frame(command_frame_t *frame) {
 /**
  * @brief 计算校验和
  * @param data 从命令字到数据全部的数据
- * @param length 长度为命令(1byte)+数据长度信息(2byte)+实际数据长度
+ * @param length 长度为命令(2byte)+数据长度信息(2byte)+实际数据长度
  * @return
  */
 static uint8_t calculate_checksum(uint8_t *data, uint16_t length) {
@@ -120,7 +122,9 @@ parse_result_t command_process_byte(uint8_t byte) {
          *因为command_frame_t结构体的command枚举量在上,数据位(2byte)在下，
          *所以command填充为2byte
          */
-        uint16_t header_size = sizeof(command_type_t) + sizeof(uint16_t);
+
+        uint16_t header_size =
+            sizeof(current_frame.command) + sizeof(current_frame.data_length);
         checksum = calculate_checksum((uint8_t *)&current_frame,
                                       header_size + current_frame.data_length);
 

@@ -43,4 +43,4 @@ void UART_InitDev(UART_Device_t *dev, UART_HandleTypeDef *huart) {
 // 以下函数请根据具体设备设置
 
 // 自定义中断处理(未开启)
-void UART_userIRQ_Handler(UART_Device_t *dev) {}
+// void UART_userIRQ_Handler(UART_Device_t *dev) {}

@@ -8,19 +8,6 @@
 extern "C" {
 #endif
 
-// 命令类型定义
-typedef enum : uint8_t {
-    CMD_VALID_START,
-    CMD_ENTER_BOOT = 0x01,
-    CMD_UPLOAD = 0x02,
-    CMD_VERIFY = 0x03,
-    CMD_RUN_APP = 0x04,
-    CMD_ACK = 0x05,
-    CMD_NACK = 0x06,
-    CMD_ERROR_RESPONSE = 0x07,
-    CMD_VALID_END
-} command_type_t;
-
 // 帧头定义
 #define FRAME_HEADER1 0xAA
 #define FRAME_HEADER2 0x55
@@ -37,8 +24,20 @@ typedef enum : uint8_t {
     ((FRAME_HEADER_SIZE * 2) + FRAME_COMMAND_SIZE + FRAME_DATA_LENGTH_INFO +   \
      FRAME_DATA_SIZE + FRAMR_CHECK_SUM_SIZE)
 
+// 命令类型定义 设置为两字节，匹配命令帧结构的填充
+typedef enum : uint16_t {
+    CMD_VALID_START,
+    CMD_ENTER_BOOT = 0x01,
+    CMD_UPLOAD = 0x02,
+    CMD_VERIFY = 0x03,
+    CMD_RUN_APP = 0x04,
+    CMD_ACK = 0x05,
+    CMD_NACK = 0x06,
+    CMD_ERROR_RESPONSE = 0x07,
+    CMD_VALID_END
+} command_type_t;
 // 命令帧结构
-typedef struct __attribute__((__packed__)) {
+typedef struct {
     command_type_t command;
     // 上位机传来的长度为小端序组成的两字节数据，所以先收到低字节，再收高字节
     uint16_t data_length;
