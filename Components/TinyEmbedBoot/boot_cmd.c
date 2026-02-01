@@ -117,7 +117,7 @@ parse_result_t command_process_byte(uint8_t byte) {
         // }
         // printf("\n");
 
-        /*
+        /* 已废弃的注释，数据类型全部使用__attribute__((__packed__))
          *这里要解释一下命令字加数据长度(header_size)为什么是4字节
          *因为command_frame_t结构体的command枚举量在上,数据位(2byte)在下，
          *所以command填充为2byte

@@ -25,7 +25,19 @@ extern "C" {
      FRAME_DATA_SIZE + FRAMR_CHECK_SUM_SIZE)
 
 // 命令类型定义 设置为两字节，匹配命令帧结构的填充
-typedef enum : uint16_t {
+// typedef enum : uint16_t {
+//     CMD_VALID_START,
+//     CMD_ENTER_BOOT = 0x01,
+//     CMD_UPLOAD = 0x02,
+//     CMD_VERIFY = 0x03,
+//     CMD_RUN_APP = 0x04,
+//     CMD_ACK = 0x05,
+//     CMD_NACK = 0x06,
+//     CMD_ERROR_RESPONSE = 0x07,
+//     CMD_VALID_END
+// } command_type_t;
+// 命令类型定义，设置为一字节，使用__attribute__((__packed__))修饰
+typedef enum {
     CMD_VALID_START,
     CMD_ENTER_BOOT = 0x01,
     CMD_UPLOAD = 0x02,
@@ -35,7 +47,7 @@ typedef enum : uint16_t {
     CMD_NACK = 0x06,
     CMD_ERROR_RESPONSE = 0x07,
     CMD_VALID_END
-} command_type_t;
+} __attribute__((__packed__)) command_type_t;
 // 命令帧结构
 typedef struct {
     command_type_t command;
@@ -43,7 +55,7 @@ typedef struct {
     uint16_t data_length;
     uint8_t data[FRAME_DATA_SIZE];
     uint8_t checksum;
-} command_frame_t;
+} __attribute__((__packed__)) command_frame_t;
 // 解析结果
 typedef enum {
     PARSE_SUCCESS,
